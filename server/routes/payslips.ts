@@ -1,9 +1,33 @@
 import { Router, Request, Response } from "express";
 import pool from "../db";
 import { generatePayslipPdf } from "../pdf/generatePayslip";
+import { generateBulkZip } from "../pdf/generateBulkZip";
 
 const router = Router();
 
+const monthName = (m: number) =>
+  ["January","February","March","April","May","June",
+   "July","August","September","October","November","December"][m - 1];
+
+// GET /api/payslips/download-bulk?year=YYYY&month=MM
+// Streams a ZIP containing individual PDF payslips for every employee
+router.get("/download-bulk", async (req: Request, res: Response) => {
+  try {
+    const year  = parseInt(req.query.year  as string || "2026", 10);
+    const month = parseInt(req.query.month as string || "3",    10);
+
+    const zipBuffer = await generateBulkZip(year, month);
+
+    const mName = monthName(month);
+    res.setHeader("Content-Type", "application/zip");
+    res.setHeader("Content-Disposition", `attachment; filename="Salary_Tracker_Export_${mName}_${year}.zip"`);
+    res.setHeader("Content-Length", zipBuffer.length);
+    return res.end(zipBuffer);
+  } catch (err: any) {
+    console.error("[payslips] bulk ZIP error:", err.message);
+    return res.status(500).json({ error: err.message });
+  }
+});
 // GET /api/payslips?year=YYYY&month=MM
 // Returns all approved payslip line items for the month
 router.get("/", async (req: Request, res: Response) => {

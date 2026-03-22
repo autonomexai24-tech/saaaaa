@@ -57,6 +57,7 @@ export default function ReceiptVault() {
   const effectiveId = selected?.employee_id ?? null;
 
   const [downloading, setDownloading] = useState<number | null>(null);
+  const [bulkDownloading, setBulkDownloading] = useState(false);
 
   const downloadPdf = async (empId: number) => {
     setDownloading(empId);
@@ -94,6 +95,33 @@ export default function ReceiptVault() {
     iframe.src = url;
     document.body.appendChild(iframe);
     iframe.onload = () => { iframe.contentWindow?.print(); setTimeout(() => document.body.removeChild(iframe), 2000); };
+  };
+
+  const downloadBulk = async () => {
+    setBulkDownloading(true);
+    const toastId = toast.loading("Generating bulk export… This may take a moment.");
+    try {
+      const resp = await fetch(`/api/payslips/download-bulk?year=${year}&month=${month}`);
+      if (!resp.ok) {
+        const errData = await resp.json().catch(() => null);
+        throw new Error(errData?.error || "Failed to generate bulk export");
+      }
+      const blob = await resp.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+      a.download = `Salary_Tracker_Export_${months[month - 1]}_${year}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast.success(`${payslips.length} payslips exported successfully`, { id: toastId });
+    } catch (err: any) {
+      toast.error("Bulk export failed", { id: toastId, description: err.message });
+    } finally {
+      setBulkDownloading(false);
+    }
   };
 
   return (
@@ -160,9 +188,9 @@ export default function ReceiptVault() {
             <Card>
               <CardContent className="p-4 space-y-2">
                 <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-3">Mass Actions</p>
-                <Button variant="outline" className="w-full h-9 text-sm gap-2 justify-center" onClick={() => window.open(`/api/payslips/${payslips[0]?.employee_id}/pdf?year=${year}&month=${month}`, "_blank")}>
+                <Button variant="outline" className="w-full h-9 text-sm gap-2 justify-center" disabled={bulkDownloading || payslips.length === 0} onClick={downloadBulk}>
                   <Download className="h-3.5 w-3.5" />
-                  Download All (ZIP coming soon)
+                  {bulkDownloading ? "Generating ZIP…" : `Download All (${payslips.length} PDFs)`}
                 </Button>
                 <Button className="w-full h-9 text-sm gap-2 justify-center bg-emerald-600 hover:bg-emerald-700 text-white">
                   <MessageCircle className="h-3.5 w-3.5" />
