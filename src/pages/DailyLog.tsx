@@ -47,6 +47,28 @@ export default function DailyLog() {
     queryFn: () => api.get<ApiCompanySettings>("/settings"),
   });
 
+  // ── Employee Balances (for advance warnings) ─────────────────────────────
+  const { data: balances = [] } = useQuery<{employee_id: number, pending_advances: number}[]>({
+    queryKey: ["advances-balances"],
+    queryFn: () => api.get("/transactions/balances"),
+  });
+
+  // ── Advance Transaction Mutation ─────────────────────────────────────────
+  const advanceMutation = useMutation({
+    mutationFn: (payload: { employee_id: number; amount: number; purpose?: string }) =>
+      api.post("/transactions", payload),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["advances-balances"] });
+      const row = rows.find((r) => r.employee_id === variables.employee_id);
+      toast.success("Advance recorded and pending recovery.", {
+        description: `${row?.name ?? "Employee"} — ₹${variables.amount}`,
+      });
+      // Clear the local edit after save
+      updateEdit(variables.employee_id, "advance", 0);
+    },
+    onError: (err: Error) => toast.error("Failed to save advance", { description: err.message }),
+  });
+
   // ── Save attendance mutation ─────────────────────────────────────────────
   const saveMutation = useMutation({
     mutationFn: (payload: { employee_id: number; date: string; time_in: string; time_out: string; advance_given: number }) =>
@@ -106,14 +128,31 @@ export default function DailyLog() {
     }
     
     // Prevent duplicate saves if nothing changed
-    if (ed.timeIn === row.time_in && ed.timeOut === row.time_out && ed.advance === Number(row.advance_given)) {
+    if (ed.timeIn === row.time_in && ed.timeOut === row.time_out) {
       toast.info("No changes to save");
       setOpenCards((prev) => ({ ...prev, [row.employee_id]: false }));
       return;
     }
 
-    saveMutation.mutate({ employee_id: row.employee_id, date: TODAY, time_in: ed.timeIn, time_out: ed.timeOut, advance_given: ed.advance });
+    saveMutation.mutate({ employee_id: row.employee_id, date: TODAY, time_in: ed.timeIn, time_out: ed.timeOut, advance_given: 0 });
   }, [localEdits, rows]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const saveAdvance = (row: ApiAttendanceRow) => {
+    const ed = getEdit(row.employee_id, row);
+    const advanceAmount = Number(ed.advance);
+    if (!advanceAmount || advanceAmount <= 0) return;
+
+    const currentBalance = balances.find(b => b.employee_id === row.employee_id)?.pending_advances || 0;
+    
+    // Safety Feature: Warning if pending exceeds 50% of monthly basic
+    if (currentBalance + advanceAmount > (row.monthly_basic * 0.5)) {
+      toast.warning("High Advance Warning", {
+        description: `Pending advances will exceed 50% of the employee's monthly basic salary (₹${row.monthly_basic}).`,
+      });
+    }
+
+    advanceMutation.mutate({ employee_id: row.employee_id, amount: advanceAmount });
+  };
 
   // ── Status derivation ────────────────────────────────────────────────────
   function getStatus(row: ApiAttendanceRow): "present" | "late" | "pending" {
@@ -223,56 +262,106 @@ export default function DailyLog() {
                         <p className="text-[11px] text-muted-foreground">{row.designation}</p>
                       </div>
                       <Badge variant="secondary" className="hidden sm:inline-flex text-[11px] font-normal">{row.department}</Badge>
-                      <StatusBadge status={status} />
+                      
+                      {row.log_id ? (
+                        <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 border-0 text-[10px]">Already Logged</Badge>
+                      ) : (
+                        <StatusBadge status={status} />
+                      )}
+                      
                       <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform duration-200", isOpen && "rotate-180")} />
                     </button>
                   </CollapsibleTrigger>
 
                   <CollapsibleContent>
                     <div className="border-t px-4 py-3 space-y-3">
-                      <div className="flex items-end gap-3">
-                        <div className="flex-1 space-y-1">
-                          <label className="text-[11px] text-muted-foreground font-medium">Time In</label>
-                          <div className="relative">
-                            <Clock className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
-                            <Input type="time" value={ed.timeIn} onChange={(e) => updateEdit(row.employee_id, "timeIn", e.target.value)} className="pl-8 text-sm h-8" />
+                      
+                      {/* Attendance Inputs (Hidden if already logged) */}
+                      {!row.log_id && (
+                        <>
+                          <div className="flex items-end gap-3">
+                            <div className="flex-1 space-y-1">
+                              <label className="text-[11px] text-muted-foreground font-medium">Time In</label>
+                              <div className="relative">
+                                <Clock className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
+                                <Input type="time" value={ed.timeIn} onChange={(e) => updateEdit(row.employee_id, "timeIn", e.target.value)} className="pl-8 text-sm h-8" />
+                              </div>
+                            </div>
+                            <div className="flex-1 space-y-1">
+                              <label className="text-[11px] text-muted-foreground font-medium">Time Out</label>
+                              <div className="relative">
+                                <Clock className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
+                                <Input type="time" value={ed.timeOut} onChange={(e) => updateEdit(row.employee_id, "timeOut", e.target.value)} className="pl-8 text-sm h-8" />
+                              </div>
+                            </div>
+                            <Button variant="outline" size="sm" className="h-8 text-[11px] px-3 shrink-0" onClick={(e) => { e.stopPropagation(); quickFill(row.employee_id); }}>
+                              <Clock className="h-3 w-3 mr-1" />
+                              9–6
+                            </Button>
                           </div>
-                        </div>
-                        <div className="flex-1 space-y-1">
-                          <label className="text-[11px] text-muted-foreground font-medium">Time Out</label>
-                          <div className="relative">
-                            <Clock className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
-                            <Input type="time" value={ed.timeOut} onChange={(e) => updateEdit(row.employee_id, "timeOut", e.target.value)} className="pl-8 text-sm h-8" />
+                      
+                          <div className="flex items-center justify-between pt-1">
+                            <div className="text-xs text-muted-foreground">
+                              {worked ? (
+                                <span>Total Shift: <span className="font-medium text-foreground">{worked.display}</span>{worked.ot && <span className="text-emerald-600 font-medium"> ({worked.ot})</span>}</span>
+                              ) : (
+                                <span className="italic">Enter times to see shift duration</span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Button variant="ghost" size="sm" className="h-7 text-xs px-3" onClick={() => setOpenCards((prev) => ({ ...prev, [row.employee_id]: false }))}>
+                                Cancel
+                              </Button>
+                              <Button size="sm" className="h-7 text-xs px-4" disabled={!ed.timeIn || !ed.timeOut || saveMutation.isPending} onClick={() => saveAttendance(row)}>
+                                {isSavingThisItem ? (
+                                  <div className="h-3 w-3 mr-1 animate-spin rounded-full border-2 border-background border-r-transparent" />
+                                ) : (
+                                  <Save className="h-3 w-3 mr-1" />
+                                )}
+                                {isSavingThisItem ? "Saving..." : "Save Attendance"}
+                              </Button>
+                            </div>
                           </div>
-                        </div>
-                        <Button variant="outline" size="sm" className="h-8 text-[11px] px-3 shrink-0" onClick={(e) => { e.stopPropagation(); quickFill(row.employee_id); }}>
-                          <Clock className="h-3 w-3 mr-1" />
-                          9–6
-                        </Button>
-                      </div>
+                        </>
+                      )}
 
-                      <div className="flex items-center justify-between pt-1">
-                        <div className="text-xs text-muted-foreground">
-                          {worked ? (
-                            <span>Total Shift: <span className="font-medium text-foreground">{worked.display}</span>{worked.ot && <span className="text-emerald-600 font-medium"> ({worked.ot})</span>}</span>
-                          ) : (
-                            <span className="italic">Enter times to see shift duration</span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Button variant="ghost" size="sm" className="h-7 text-xs px-3" onClick={() => setOpenCards((prev) => ({ ...prev, [row.employee_id]: false }))}>
-                            Cancel
-                          </Button>
-                          <Button size="sm" className="h-7 text-xs px-4" disabled={!ed.timeIn || !ed.timeOut || saveMutation.isPending} onClick={() => saveAttendance(row)}>
-                            {isSavingThisItem ? (
-                              <div className="h-3 w-3 mr-1 animate-spin rounded-full border-2 border-background border-r-transparent" />
-                            ) : (
-                              <Save className="h-3 w-3 mr-1" />
-                            )}
-                            {isSavingThisItem ? "Saving..." : "Save Attendance"}
-                          </Button>
-                        </div>
-                      </div>
+                      {/* Advance Input (Admin Only) */}
+                      {isAdmin && (
+                        <>
+                          {!row.log_id && <div className="h-px bg-border my-2" />}
+                          <div className="flex items-end gap-3">
+                            <div className="flex-1 space-y-1">
+                              <label className="text-[11px] text-muted-foreground font-medium flex justify-between">
+                                <span>Issue Advance (₹)</span>
+                                {(() => {
+                                  const bal = balances.find(b => b.employee_id === row.employee_id);
+                                  return bal && bal.pending_advances > 0 ? (
+                                    <span className="text-amber-600">Pending: ₹{Number(bal.pending_advances).toLocaleString("en-IN")}</span>
+                                  ) : null;
+                                })()}
+                              </label>
+                              <Input 
+                                type="number" 
+                                min="0" 
+                                placeholder="0"
+                                value={ed.advance || ""} 
+                                onChange={(e) => updateEdit(row.employee_id, "advance", Number(e.target.value))} 
+                                className="text-sm h-8" 
+                              />
+                            </div>
+                            <Button 
+                              variant="secondary"
+                              size="sm" 
+                              className="h-8 text-xs px-4 border" 
+                              disabled={!ed.advance || advanceMutation.isPending} 
+                              onClick={() => saveAdvance(row)}
+                            >
+                              {advanceMutation.isPending && advanceMutation.variables?.employee_id === row.employee_id ? "Saving..." : "Submit Advance"}
+                            </Button>
+                          </div>
+                        </>
+                      )}
+
                     </div>
                   </CollapsibleContent>
                 </Card>

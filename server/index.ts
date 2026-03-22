@@ -12,6 +12,7 @@ import payrollRouter    from "./routes/payroll";
 import payslipsRouter   from "./routes/payslips";
 import authRouter       from "./routes/auth";
 import usersRouter      from "./routes/users";
+import transactionsRouter from "./routes/transactions";
 
 const app  = express();
 const PORT = Number(process.env.PORT || 3001);
@@ -30,6 +31,7 @@ app.use("/api/users",       usersRouter);
 app.use("/api/settings",    companyRouter);
 app.use("/api/employees",   employeesRouter);
 app.use("/api/attendance",  attendanceRouter);
+app.use("/api/transactions",transactionsRouter);
 app.use("/api/payroll",     payrollRouter);
 app.use("/api/payslips",    payslipsRouter);
 

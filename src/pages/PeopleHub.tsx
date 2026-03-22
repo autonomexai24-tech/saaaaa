@@ -45,6 +45,11 @@ export default function PeopleHub() {
     queryFn: () => api.get<ApiDesignation[]>("/settings/designations"),
   });
 
+  const { data: balances = [] } = useQuery<{employee_id: number, pending_advances: number}[]>({
+    queryKey: ["advances-balances"],
+    queryFn: () => api.get("/transactions/balances"),
+  });
+
   // ── Create employee mutation ─────────────────────────────────────────────
   const createMutation = useMutation({
     mutationFn: (body: object) => api.post<ApiEmployee>("/employees", body),
@@ -136,6 +141,17 @@ export default function PeopleHub() {
                         {emp.emp_code}
                         {emp.joined_on && ` · Joined ${format(parseISO(emp.joined_on), "dd MMM yyyy")}`}
                       </p>
+                      {(() => {
+                        const bal = balances.find(b => b.employee_id === emp.id);
+                        if (bal && bal.pending_advances > 0) {
+                          return (
+                            <Badge variant="outline" className="mt-2 text-[10px] text-amber-600 border-amber-200 bg-amber-50">
+                              Pending Advances: ₹{Number(bal.pending_advances).toLocaleString("en-IN")}
+                            </Badge>
+                          );
+                        }
+                        return null;
+                      })()}
                     </div>
                   </CardContent>
                 </Card>
