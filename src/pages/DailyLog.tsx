@@ -325,42 +325,7 @@ export default function DailyLog() {
                         </>
                       )}
 
-                      {/* Advance Input (Admin Only) */}
-                      {isAdmin && (
-                        <>
-                          {!row.log_id && <div className="h-px bg-border my-2" />}
-                          <div className="flex items-end gap-3">
-                            <div className="flex-1 space-y-1">
-                              <label className="text-[11px] text-muted-foreground font-medium flex justify-between">
-                                <span>Issue Advance (₹)</span>
-                                {(() => {
-                                  const bal = balances.find(b => b.employee_id === row.employee_id);
-                                  return bal && bal.pending_advances > 0 ? (
-                                    <span className="text-amber-600">Pending: ₹{Number(bal.pending_advances).toLocaleString("en-IN")}</span>
-                                  ) : null;
-                                })()}
-                              </label>
-                              <Input 
-                                type="number" 
-                                min="0" 
-                                placeholder="0"
-                                value={ed.advance || ""} 
-                                onChange={(e) => updateEdit(row.employee_id, "advance", Number(e.target.value))} 
-                                className="text-sm h-8" 
-                              />
-                            </div>
-                            <Button 
-                              variant="secondary"
-                              size="sm" 
-                              className="h-8 text-xs px-4 border" 
-                              disabled={!ed.advance || advanceMutation.isPending} 
-                              onClick={() => saveAdvance(row)}
-                            >
-                              {advanceMutation.isPending && advanceMutation.variables?.employee_id === row.employee_id ? "Saving..." : "Submit Advance"}
-                            </Button>
-                          </div>
-                        </>
-                      )}
+
 
                     </div>
                   </CollapsibleContent>
