@@ -1,6 +1,7 @@
 import { useState } from "react";
 // TODO [BACKEND]: Replace mock login with fetch("/api/auth/login", { method: "POST", body: JSON.stringify({ email, password }) })
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,15 +12,47 @@ import { useAuth, type AppRole } from "@/contexts/AuthContext";
 import { useBranding } from "@/lib/useBranding";
 
 export default function Login() {
-  const { login } = useAuth();
+  const { setUser } = useAuth();
   const navigate = useNavigate();
   const { data: branding } = useBranding();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
+  // For testing convenience
   const handleMockLogin = (role: AppRole) => {
-    login(role);
-    navigate("/");
+    const mockEmail = role === "admin" ? "admin@printworks.com" : "frontdesk@printworks.com";
+    setEmail(mockEmail);
+    setPassword("password123");
+  };
+
+  const handleRealLogin = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!email || !password) {
+      toast.error("Please enter email and password");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+      
+      if (!res.ok) throw new Error(data.error || "Login failed");
+
+      // Set session & navigate
+      setUser(data.user);
+      navigate("/");
+      toast.success("Welcome back!");
+    } catch (err: any) {
+      toast.error("Authentication failed", { description: err.message });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -89,7 +122,7 @@ export default function Login() {
                 <p className="text-sm text-muted-foreground">Enter your credentials to access the dashboard.</p>
               </div>
 
-              <div className="space-y-4">
+              <form onSubmit={handleRealLogin} className="space-y-4">
                 <div className="space-y-1.5">
                   <Label className="text-xs font-medium">User ID / Email</Label>
                   <div className="relative">
@@ -99,6 +132,7 @@ export default function Login() {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       className="pl-9 h-10 text-sm"
+                      disabled={loading}
                     />
                   </div>
                 </div>
@@ -112,15 +146,16 @@ export default function Login() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       className="pl-9 h-10 text-sm"
+                      disabled={loading}
                     />
                   </div>
                 </div>
 
-                <Button className="w-full h-10 text-sm gap-2 font-semibold" onClick={() => handleMockLogin("admin")}>
+                <Button type="submit" className="w-full h-10 text-sm gap-2 font-semibold" disabled={loading}>
                   <LogIn className="h-4 w-4" />
-                  Secure Login
+                  {loading ? "Authenticating..." : "Secure Login"}
                 </Button>
-              </div>
+              </form>
 
               <Separator />
 
