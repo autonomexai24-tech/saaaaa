@@ -36,17 +36,23 @@ router.get("/ledger", async (req: Request, res: Response) => {
 
     const runId = await getOrCreateRun(year, month);
 
-    // Get all active employees
-    const { rows: emps } = await pool.query(
-      "SELECT id FROM employees WHERE is_active = TRUE"
+    // Check if this run is already locked/approved — skip recalculation
+    const { rows: runRows } = await pool.query(
+      "SELECT status FROM payroll_runs WHERE id = $1", [runId]
     );
+    const runStatus = runRows[0]?.status ?? "draft";
 
-    // Calculate each employee (upserts into payroll_line_items)
-    for (const emp of emps) {
-      await pool.query(
-        "SELECT calculate_payroll_for_employee($1, $2)",
-        [runId, emp.id]
+    if (runStatus === "draft") {
+      // Only recalculate for draft runs
+      const { rows: emps } = await pool.query(
+        "SELECT id FROM employees WHERE is_active = TRUE"
       );
+      for (const emp of emps) {
+        await pool.query(
+          "SELECT calculate_payroll_for_employee($1, $2)",
+          [runId, emp.id]
+        );
+      }
     }
 
     // Return the full ledger joined with employee details

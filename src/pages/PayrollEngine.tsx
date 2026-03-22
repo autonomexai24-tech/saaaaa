@@ -13,9 +13,13 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   CalendarIcon, CheckCircle2, Clock, IndianRupee,
   TrendingDown, TrendingUp, Minus, Plus, Equal,
-  FileCheck, AlertTriangle, Timer,
+  FileCheck, AlertTriangle, Timer, Lock, Zap,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -28,6 +32,7 @@ export default function PayrollEngine() {
   const [reviewRow, setReviewRow] = useState<ApiPayrollRow | null>(null);
   const [bonus, setBonus] = useState("");
   const [fines, setFines] = useState("");
+  const [lockConfirmOpen, setLockConfirmOpen] = useState(false);
 
   const year  = selectedMonth.getFullYear();
   const month = selectedMonth.getMonth() + 1;
@@ -78,7 +83,8 @@ export default function PayrollEngine() {
   }, [employees]);
 
   const inr = (n: number) => Number(n || 0).toLocaleString("en-IN");
-  const isLocked = ledger?.status === "locked";
+  const isLocked = ledger?.status === "locked" || ledger?.status === "approved";
+  const isDraft  = !isLocked;
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
@@ -89,6 +95,20 @@ export default function PayrollEngine() {
           <p className="text-sm text-muted-foreground mt-1">Hourly-driven Master Ledger — auto-calculated from total hours logged.</p>
         </div>
         <div className="flex items-center gap-3">
+          {/* Live / Locked Status Badge */}
+          {ledger && !isLoading && (
+            isDraft ? (
+              <Badge variant="outline" className="h-8 px-3 text-xs gap-1.5 border-amber-300 bg-amber-50 text-amber-700">
+                <Zap className="h-3 w-3" />
+                Live Draft
+              </Badge>
+            ) : (
+              <Badge className="h-8 px-3 text-xs gap-1.5 bg-emerald-600 text-white">
+                <Lock className="h-3 w-3" />
+                🔒 PAYROLL LOCKED
+              </Badge>
+            )
+          )}
           <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
             <PopoverTrigger asChild>
               <Button variant="outline" className="h-9 text-sm gap-2 min-w-[160px] justify-start">
@@ -100,15 +120,39 @@ export default function PayrollEngine() {
               <Calendar mode="single" selected={selectedMonth} onSelect={(d) => { if (d) { setSelectedMonth(d); setCalendarOpen(false); } }} className={cn("p-3 pointer-events-auto")} initialFocus />
             </PopoverContent>
           </Popover>
-          {!isLocked && (
-            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white h-9 text-sm gap-2" onClick={() => approveMutation.mutate()} disabled={approveMutation.isPending || !runId || employees.length === 0}>
+          {isDraft && (
+            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white h-9 text-sm gap-2" onClick={() => setLockConfirmOpen(true)} disabled={approveMutation.isPending || !runId || employees.length === 0}>
               <FileCheck className="h-3.5 w-3.5" />
-              {approveMutation.isPending ? "Processing…" : "Approve & Generate Payslips"}
+              {approveMutation.isPending ? "Processing…" : "Lock & Finalize Payroll"}
             </Button>
           )}
-          {isLocked && <Badge className="bg-emerald-600 text-white h-9 px-4 text-sm flex items-center gap-2"><CheckCircle2 className="h-3.5 w-3.5" />Approved & Locked</Badge>}
         </div>
       </div>
+
+      {/* Lock Confirmation AlertDialog */}
+      <AlertDialog open={lockConfirmOpen} onOpenChange={setLockConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Once locked, attendance and advances for this month cannot be edited. This action is permanent. All payslips will be generated and the payroll run will be marked as approved.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              onClick={() => {
+                approveMutation.mutate();
+                setLockConfirmOpen(false);
+              }}
+            >
+              <Lock className="h-3.5 w-3.5 mr-1.5" />
+              Yes, Lock & Finalize
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Pulse Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
