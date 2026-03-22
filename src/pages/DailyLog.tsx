@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CalendarDays, ChevronDown, Clock, Users, UserCheck, UserX, BarChart3, Save, Download } from "lucide-react";
 import { toast } from "sonner";
-import { api, type ApiAttendanceRow } from "@/lib/api";
+import { api, type ApiAttendanceRow, type ApiCompanySettings } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 
@@ -39,6 +39,12 @@ export default function DailyLog() {
     queryKey: ["attendance-monthly", reportYear, reportMonth],
     queryFn: () => api.get<any[]>(`/attendance/monthly-summary?year=${reportYear}&month=${reportMonth}`),
     enabled: reportOpen,
+  });
+
+  // ── Company Settings (for shift timing calculations) ──────────────────────
+  const { data: settings } = useQuery<ApiCompanySettings>({
+    queryKey: ["company-settings"],
+    queryFn: () => api.get<ApiCompanySettings>("/settings"),
   });
 
   // ── Save attendance mutation ─────────────────────────────────────────────
@@ -84,7 +90,7 @@ export default function DailyLog() {
     setLocalEdits((prev) => ({ ...prev, [empId]: { ...getEdit(empId, rows.find((r) => r.employee_id === empId)!), [field]: value } }));
 
   const quickFill = (empId: number) =>
-    setLocalEdits((prev) => ({ ...prev, [empId]: { ...getEdit(empId, rows.find((r) => r.employee_id === empId)!), timeIn: "09:00", timeOut: "18:00" } }));
+    setLocalEdits((prev) => ({ ...prev, [empId]: { ...getEdit(empId, rows.find((r) => r.employee_id === empId)!), timeIn: settings?.shift_start || "09:00", timeOut: settings?.shift_end || "18:00" } }));
 
   const saveAttendance = useCallback((row: ApiAttendanceRow) => {
     const ed = getEdit(row.employee_id, row);
@@ -115,7 +121,13 @@ export default function DailyLog() {
     if (!ti) return "pending";
     const [h, m] = ti.split(":").map(Number);
     const inMin = h * 60 + m;
-    if (inMin > 9 * 60 + 10) return "late";
+    
+    const shiftStart = settings?.shift_start || "09:00";
+    const grace = settings?.grace_period_minutes ?? 10;
+    const [sh, sm] = shiftStart.split(":").map(Number);
+    const shiftMin = sh * 60 + sm;
+
+    if (inMin > shiftMin + grace) return "late";
     return "present";
   }
 
@@ -181,13 +193,20 @@ export default function DailyLog() {
             const ed = getEdit(row.employee_id, row);
             const status = getStatus(row);
             const isOpen = openCards[row.employee_id] ?? false;
+            const isSavingThisItem = saveMutation.isPending && saveMutation.variables?.employee_id === row.employee_id;
+            
             const worked = (() => {
               if (!ed.timeIn || !ed.timeOut) return null;
               const [ih, im] = ed.timeIn.split(":").map(Number);
               const [oh, om] = ed.timeOut.split(":").map(Number);
               const mins = (oh * 60 + om) - (ih * 60 + im);
               const h = Math.floor(mins / 60), m = mins % 60;
-              const otMins = Math.max(0, (oh * 60 + om) - 18 * 60);
+              
+              const shiftEnd = settings?.shift_end || "18:00";
+              const [eh, em] = shiftEnd.split(":").map(Number);
+              const endMin = eh * 60 + em;
+              
+              const otMins = Math.max(0, (oh * 60 + om) - endMin);
               return { display: `${h}h ${m}m`, ot: otMins > 0 ? `+${Math.floor(otMins / 60)}h ${otMins % 60}m OT` : "" };
             })();
 
@@ -245,8 +264,12 @@ export default function DailyLog() {
                             Cancel
                           </Button>
                           <Button size="sm" className="h-7 text-xs px-4" disabled={!ed.timeIn || !ed.timeOut || saveMutation.isPending} onClick={() => saveAttendance(row)}>
-                            <Save className="h-3 w-3 mr-1" />
-                            Save Attendance
+                            {isSavingThisItem ? (
+                              <div className="h-3 w-3 mr-1 animate-spin rounded-full border-2 border-background border-r-transparent" />
+                            ) : (
+                              <Save className="h-3 w-3 mr-1" />
+                            )}
+                            {isSavingThisItem ? "Saving..." : "Save Attendance"}
                           </Button>
                         </div>
                       </div>
