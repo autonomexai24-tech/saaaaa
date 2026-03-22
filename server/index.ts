@@ -46,7 +46,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // ── Production: serve Vite-built frontend ──────────────────────────────────
-const distPath = path.join(__dirname, '../../dist'); 
+const distPath = path.join(__dirname, '../dist'); 
 app.use(express.static(distPath));
 app.get('*', (req, res) => {
   res.sendFile(path.join(distPath, 'index.html'));
