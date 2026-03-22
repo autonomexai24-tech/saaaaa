@@ -1,9 +1,12 @@
 import express from "express";
 import cors from "cors";
 import path from "path";
+import fs from "fs";
 import dotenv from "dotenv";
 
 dotenv.config();
+
+import pool from "./db";
 
 import companyRouter    from "./routes/company";
 import employeesRouter  from "./routes/employees";
@@ -52,11 +55,31 @@ app.get(/^.*$/, (req, res) => {
   res.sendFile(path.join(distPath, 'index.html'));
 });
 
-// ── Start ───────────────────────────────────────────────────────────────────
-app.listen(PORT, () => {
-  console.log(`\n🚀  Salary Tracker API ready → http://localhost:${PORT}`);
-  console.log(`   Health: http://localhost:${PORT}/api/health`);
-  console.log(`   Static: serving ./dist\n`);
+// ── Database Sync & Server Start ────────────────────────────────────────────
+
+async function initializeDatabase() {
+  try {
+    const sqlPath = path.join(process.cwd(), "database", "final_production.sql");
+    if (fs.existsSync(sqlPath)) {
+      const sqlString = fs.readFileSync(sqlPath, "utf-8");
+      const client = await pool.connect();
+      await client.query(sqlString);
+      client.release();
+      console.log("[db] ✅ Remote database synced successfully");
+    } else {
+      console.log("[db] ⚠️ final_production.sql not found, skipping sync");
+    }
+  } catch (err: any) {
+    console.error("[db] ❌ Failed to sync database automatically:", err.message);
+  }
+}
+
+initializeDatabase().then(() => {
+  app.listen(PORT, () => {
+    console.log(`\n🚀  Salary Tracker API ready → http://localhost:${PORT}`);
+    console.log(`   Health: http://localhost:${PORT}/api/health`);
+    console.log(`   Static: serving ./dist\n`);
+  });
 });
 
 export default app;
