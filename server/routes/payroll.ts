@@ -28,73 +28,27 @@ router.get("/runs", async (_req: Request, res: Response) => {
 });
 
 // GET /api/payroll/ledger?year=YYYY&month=MM
-// Returns a full payroll ledger (calls calculate_payroll_for_employee for each active employee)
+// Calls get_unified_payroll() — the database handles lock-vs-draft routing
 router.get("/ledger", async (req: Request, res: Response) => {
   try {
     const year  = parseInt(req.query.year  as string || "2026", 10);
     const month = parseInt(req.query.month as string || "3",    10);
 
-    const runId = await getOrCreateRun(year, month);
-
-    // Check if this run is already locked/approved — skip recalculation
-    const { rows: runRows } = await pool.query(
-      "SELECT status FROM payroll_runs WHERE id = $1", [runId]
-    );
-    const runStatus = runRows[0]?.status ?? "draft";
-
-    if (runStatus === "draft") {
-      // Only recalculate for draft runs
-      const { rows: emps } = await pool.query(
-        "SELECT id FROM employees WHERE is_active = TRUE"
-      );
-      for (const emp of emps) {
-        await pool.query(
-          "SELECT calculate_payroll_for_employee($1, $2)",
-          [runId, emp.id]
-        );
-      }
-    }
-
-    // Return the full ledger joined with employee details
     const { rows } = await pool.query(
-      `SELECT
-         pli.id,
-         pli.payroll_run_id,
-         e.id          AS employee_id,
-         e.emp_code,
-         e.name,
-         UPPER(SUBSTRING(e.name FROM 1 FOR 1) || COALESCE(SUBSTRING(e.name FROM POSITION(' ' IN e.name) + 1 FOR 1), '')) AS avatar,
-         d.name        AS department,
-         des.name      AS designation,
-         pli.base_salary,
-         pli.standard_hours,
-         pli.hours_logged,
-         pli.hourly_rate,
-         pli.paid_leaves,
-         pli.ot_hours,
-         pli.ot_pay,
-         pli.bonus,
-         pli.short_hours,
-         pli.short_deduction,
-         pli.advances_taken,
-         pli.professional_tax,
-         pli.fines,
-         pli.gross_earnings,
-         pli.total_deductions,
-         pli.net_payable,
-         pli.leave_balance_snap,
-         pr.status     AS run_status
-       FROM payroll_line_items pli
-       JOIN employees    e   ON e.id   = pli.employee_id
-       LEFT JOIN departments  d   ON d.id   = e.department_id
-       LEFT JOIN designations des ON des.id = e.designation_id
-       JOIN payroll_runs pr  ON pr.id = pli.payroll_run_id
-       WHERE pli.payroll_run_id = $1
-       ORDER BY e.name`,
-      [runId]
+      "SELECT get_unified_payroll($1, $2) AS result",
+      [month, year]
     );
 
-    return res.json({ run_id: runId, year, month, status: rows[0]?.run_status ?? "draft", employees: rows });
+    const envelope = rows[0].result;
+    // envelope = { is_locked: bool, run_id: int|null, data: [...] }
+
+    return res.json({
+      run_id:    envelope.run_id,
+      year,
+      month,
+      status:    envelope.is_locked ? "locked" : "draft",
+      employees: envelope.data ?? [],
+    });
   } catch (err: any) {
     console.error("[payroll] ledger error:", err.message);
     return res.status(500).json({ error: err.message });
