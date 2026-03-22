@@ -1,4 +1,7 @@
 import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { api } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,33 +15,55 @@ interface SystemUser {
   id: string;
   name: string;
   userId: string;
-  role: "Admin" | "Operator";
+  role: "admin" | "operator";
 }
 
-const INITIAL_USERS: SystemUser[] = [
-  { id: "su1", name: "Admin User", userId: "admin@printworks.com", role: "Admin" },
-  { id: "su2", name: "Front Desk", userId: "frontdesk", role: "Operator" },
-];
-
 export default function Settings() {
+  const queryClient = useQueryClient();
+
   // Branding
   const [companyName, setCompanyName] = useState("PrintWorks Pvt. Ltd.");
   const [companyAddress, setCompanyAddress] = useState("42 Industrial Area, Sector 7\nNew Delhi — 110020");
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
 
   // User management
-  const [users, setUsers] = useState<SystemUser[]>(INITIAL_USERS);
+  const { data: users = [], isLoading: isUsersLoading } = useQuery<SystemUser[]>({
+    queryKey: ["users"],
+    queryFn: () => api.get<SystemUser[]>("/users"),
+  });
+
   const [newName, setNewName] = useState("");
   const [newUserId, setNewUserId] = useState("");
-  const [newRole, setNewRole] = useState<"Admin" | "Operator">("Operator");
+  const [newRole, setNewRole] = useState<"admin" | "operator">("operator");
   const [newPassword, setNewPassword] = useState("");
 
+  const addUserMutation = useMutation({
+    mutationFn: (body: any) => api.post("/users", body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+      setNewName("");
+      setNewUserId("");
+      setNewPassword("");
+      toast.success("User added successfully");
+    },
+    onError: (err: Error) => toast.error("Failed to add user", { description: err.message }),
+  });
+
+  const revokeUserMutation = useMutation({
+    mutationFn: (id: string) => api.put(`/users/${id}/revoke`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+      toast.success("Access revoked");
+    },
+    onError: (err: Error) => toast.error("Failed to revoke user", { description: err.message }),
+  });
+
   const addUser = () => {
-    if (!newName.trim() || !newUserId.trim()) return;
-    setUsers(prev => [...prev, { id: `su${Date.now()}`, name: newName.trim(), userId: newUserId.trim(), role: newRole }]);
-    setNewName("");
-    setNewUserId("");
-    setNewPassword("");
+    if (!newName.trim() || !newUserId.trim() || !newPassword.trim()) {
+      toast.error("Please fill all fields");
+      return;
+    }
+    addUserMutation.mutate({ name: newName.trim(), userId: newUserId.trim(), role: newRole, password: newPassword });
   };
 
   return (
@@ -114,11 +139,11 @@ export default function Settings() {
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">Role</Label>
-                <Select value={newRole} onValueChange={(v) => setNewRole(v as "Admin" | "Operator")}>
+                <Select value={newRole} onValueChange={(v) => setNewRole(v as "admin" | "operator")}>
                   <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Admin">Admin</SelectItem>
-                    <SelectItem value="Operator">Operator</SelectItem>
+                    <SelectItem value="admin">Admin</SelectItem>
+                    <SelectItem value="operator">Operator</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -127,9 +152,9 @@ export default function Settings() {
                 <Input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="••••••••" className="h-9 text-sm" />
               </div>
             </div>
-            <Button size="sm" variant="outline" className="w-full" onClick={addUser} disabled={!newName.trim() || !newUserId.trim()}>
+            <Button size="sm" variant="outline" className="w-full" onClick={addUser} disabled={!newName.trim() || !newUserId.trim() || !newPassword.trim() || addUserMutation.isPending}>
               <Plus className="h-3.5 w-3.5 mr-1.5" />
-              Add User
+              {addUserMutation.isPending ? "Adding..." : "Add User"}
             </Button>
 
             {/* Active users */}
@@ -147,8 +172,8 @@ export default function Settings() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge variant={u.role === "Admin" ? "default" : "secondary"} className="text-[10px]">{u.role}</Badge>
-                    <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => setUsers(prev => prev.filter(x => x.id !== u.id))}>
+                    <Badge variant={u.role === "admin" ? "default" : "secondary"} className="text-[10px] capitalize">{u.role}</Badge>
+                    <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => revokeUserMutation.mutate(u.id)} disabled={revokeUserMutation.isPending}>
                       <UserX className="h-3 w-3 mr-1" />
                       Revoke
                     </Button>

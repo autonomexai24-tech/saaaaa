@@ -10,6 +10,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
   });
   if (!res.ok) {
+    if (res.status === 401) {
+      window.dispatchEvent(new Event('auth:unauthorized'));
+    }
     let msg = `API error ${res.status}`;
     try { msg = (await res.json()).error ?? msg; } catch { /* empty */ }
     throw new Error(msg);

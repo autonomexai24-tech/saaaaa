@@ -11,6 +11,7 @@ import attendanceRouter from "./routes/attendance";
 import payrollRouter    from "./routes/payroll";
 import payslipsRouter   from "./routes/payslips";
 import authRouter       from "./routes/auth";
+import usersRouter      from "./routes/users";
 
 const app  = express();
 const PORT = Number(process.env.PORT || 3001);
@@ -25,6 +26,7 @@ app.use("/uploads", express.static(path.join(process.cwd(), "public", "uploads")
 
 // ── Routes ─────────────────────────────────────────────────────────────────
 app.use("/api/auth",        authRouter);
+app.use("/api/users",       usersRouter);
 app.use("/api/settings",    companyRouter);
 app.use("/api/employees",   employeesRouter);
 app.use("/api/attendance",  attendanceRouter);
