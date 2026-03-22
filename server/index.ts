@@ -15,7 +15,7 @@ import usersRouter      from "./routes/users";
 import transactionsRouter from "./routes/transactions";
 
 const app  = express();
-const PORT = Number(process.env.PORT || 3001);
+const PORT = Number(process.env.PORT || 5000);
 
 // ── Middleware ──────────────────────────────────────────────────────────────
 app.use(cors({ origin: "*" }));
