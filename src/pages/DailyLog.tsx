@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { CalendarDays, ChevronDown, Clock, Users, UserCheck, UserX, BarChart3, Save, Download } from "lucide-react";
 import { toast } from "sonner";
 import { api, type ApiAttendanceRow } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 
 type FilterStatus = "all" | "present" | "late" | "pending";
@@ -18,6 +19,7 @@ type FilterStatus = "all" | "present" | "late" | "pending";
 const TODAY = new Date().toISOString().split("T")[0];
 
 export default function DailyLog() {
+  const { isAdmin } = useAuth();
   const queryClient = useQueryClient();
   const [openCards, setOpenCards] = useState<Record<number, boolean>>({});
   const [localEdits, setLocalEdits] = useState<Record<number, { timeIn: string; timeOut: string; advance: number }>>({});
@@ -146,10 +148,12 @@ export default function DailyLog() {
             {today}
           </p>
         </div>
-        <Button variant="outline" className="h-9 text-sm gap-2" onClick={() => setReportOpen(true)}>
-          <BarChart3 className="h-3.5 w-3.5" />
-          View Monthly Attendance Report
-        </Button>
+        {isAdmin && (
+          <Button variant="outline" className="h-9 text-sm gap-2" onClick={() => setReportOpen(true)}>
+            <BarChart3 className="h-3.5 w-3.5" />
+            View Monthly Attendance Report
+          </Button>
+        )}
       </div>
 
       {/* Stats Bar */}

@@ -2,6 +2,8 @@ import { Navigate, Outlet } from "react-router-dom";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { useAuth } from "@/contexts/AuthContext";
+import { useEffect } from "react";
+import { toast } from "sonner";
 
 export function AppLayout() {
   const { user, isLoading } = useAuth();
@@ -40,6 +42,13 @@ export function AdminRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
   if (isLoading) return null;
   if (!user) return <Navigate to="/login" replace />;
-  if (user.role !== "admin") return <Navigate to="/" replace />;
+  if (user.role !== "admin") return <ForbiddenRedirect />;
   return <>{children}</>;
+}
+
+function ForbiddenRedirect() {
+  useEffect(() => {
+    toast.error("Access Denied", { description: "You do not have administrative privileges to view this page." });
+  }, []);
+  return <Navigate to="/" replace />;
 }
