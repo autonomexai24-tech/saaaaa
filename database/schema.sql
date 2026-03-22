@@ -39,6 +39,20 @@
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 -- =============================================================================
+-- 0. PROFILES  (system users — admin / operator logins)
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS profiles (
+    id              SERIAL      PRIMARY KEY,
+    name            TEXT        NOT NULL,
+    email           TEXT        NOT NULL UNIQUE,
+    role            TEXT        NOT NULL DEFAULT 'operator'
+                        CHECK (role IN ('admin', 'operator')),
+    dummy_password  TEXT        NOT NULL DEFAULT 'password123',
+    is_active       BOOLEAN     NOT NULL DEFAULT TRUE,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- =============================================================================
 -- 1. COMPANY_SETTINGS  (singleton — id is always 1)
 -- =============================================================================
 CREATE TABLE IF NOT EXISTS company_settings (

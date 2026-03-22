@@ -8,6 +8,16 @@
 BEGIN;
 
 -- =============================================================================
+-- 0. Profiles (system login users)
+-- =============================================================================
+INSERT INTO profiles (name, email, role, dummy_password) VALUES
+    ('Admin User',     'admin@printworks.com',     'admin',    'password123'),
+    ('Front Desk',     'frontdesk@printworks.com', 'operator', 'password123')
+ON CONFLICT (email) DO NOTHING;
+
+
+
+-- =============================================================================
 -- 1. Company Settings (singleton)
 -- =============================================================================
 INSERT INTO company_settings (
