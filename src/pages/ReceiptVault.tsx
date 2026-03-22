@@ -14,6 +14,7 @@ import {
 import { cn } from "@/lib/utils";
 import { api, type ApiPayrollRow } from "@/lib/api";
 import { useBranding } from "@/lib/useBranding";
+import { toast } from "sonner";
 
 // ── Amount in words (Indian) ─────────────────────────────────────────────
 function amountToWords(n: number): string {
@@ -55,8 +56,35 @@ export default function ReceiptVault() {
   const selected = payslips.find((p) => p.employee_id === selectedId) ?? payslips[0] ?? null;
   const effectiveId = selected?.employee_id ?? null;
 
-  const downloadPdf = (empId: number) => {
-    window.open(`/api/payslips/${empId}/pdf?year=${year}&month=${month}`, "_blank");
+  const [downloading, setDownloading] = useState<number | null>(null);
+
+  const downloadPdf = async (empId: number) => {
+    setDownloading(empId);
+    const toastId = toast.loading("Generating secure payslip…");
+    try {
+      const resp = await fetch(`/api/payslips/${empId}/pdf?year=${year}&month=${month}`);
+      if (!resp.ok) {
+        const errData = await resp.json().catch(() => null);
+        throw new Error(errData?.error || "Failed to generate payslip");
+      }
+      const blob = await resp.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const emp = payslips.find(p => p.employee_id === empId);
+      const empName = (emp?.name || "Employee").replace(/\s+/g, "_");
+      const monthStr = String(month).padStart(2, "0");
+      a.download = `Payslip_${empName}_${year}-${monthStr}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast.success("Payslip downloaded successfully", { id: toastId });
+    } catch (err: any) {
+      toast.error("Download failed", { id: toastId, description: err.message });
+    } finally {
+      setDownloading(null);
+    }
   };
 
   const printPdf = (empId: number) => {
