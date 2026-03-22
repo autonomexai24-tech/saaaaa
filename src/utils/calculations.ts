@@ -132,13 +132,8 @@ export interface NetPayResult {
 /**
  * `calculateNetPay` — client-side payroll calculation.
  *
- * This is the Stage 1A placeholder. It will be fleshed out in Stage 5
- * once the full hours-from-attendance data pipeline is wired.
- *
- * The authoritative result always comes from the PostgreSQL function
- * `calculate_payroll_for_employee(run_id, employee_id, ...)` via
- * POST /api/payroll/calculate — this function exists so the UI can
- * show a live preview before the server round-trip.
+ * @deprecated Use the authoritative PostgreSQL function `calculate_payroll_for_employee`
+ * via POST `/api/payroll/calculate` instead. This is only kept for legacy tests.
  */
 export function calculateNetPay(input: NetPayInput): NetPayResult {
   const { employee, attendance, settings, bonus = 0, fines = 0, professionalTax = 0, paidLeaves = 0 } = input;
