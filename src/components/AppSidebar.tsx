@@ -2,6 +2,7 @@ import { CalendarDays, Users, Calculator, FileText, Settings } from "lucide-reac
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useBranding } from "@/lib/useBranding";
 import {
   Sidebar,
   SidebarContent,
@@ -31,6 +32,7 @@ export function AppSidebar() {
   const collapsed = state === "collapsed";
   const location = useLocation();
   const { user, logout } = useAuth();
+  const { data: branding } = useBranding();
 
   const visibleItems = allNavItems.filter(item => user && (item.roles as readonly string[]).includes(user.role));
 
@@ -38,13 +40,19 @@ export function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground text-sm font-bold">
-            P
-          </div>
+          {branding?.logoPath ? (
+            <img src={branding.logoPath} alt="Logo" className="h-8 w-8 object-contain rounded-lg shrink-0" />
+          ) : (
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground text-sm font-bold">
+              {branding?.initials || "S"}
+            </div>
+          )}
           {!collapsed && (
             <div className="flex flex-col">
-              <span className="text-sm font-semibold text-sidebar-foreground">Salary & Advance</span>
-              <span className="text-[11px] text-sidebar-foreground/60">Tracker</span>
+              <span className="text-sm font-semibold text-sidebar-foreground truncate" title={branding?.companyName || "Salary Tracker"}>
+                {branding?.companyName || "Salary Tracker"}
+              </span>
+              <span className="text-[11px] text-sidebar-foreground/60">ERP Dashboard</span>
             </div>
           )}
         </div>

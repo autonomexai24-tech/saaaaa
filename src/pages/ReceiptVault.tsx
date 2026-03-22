@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api, type ApiPayrollRow } from "@/lib/api";
+import { useBranding } from "@/lib/useBranding";
 
 // ── Amount in words (Indian) ─────────────────────────────────────────────
 function amountToWords(n: number): string {
@@ -33,12 +34,6 @@ function amountToWords(n: number): string {
 
 const fmtInr = (n: number) => Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-// ── Company settings ─────────────────────────────────────────────────────
-interface CompanyInfo {
-  company_name: string;
-  company_address: string;
-  logo_path: string | null;
-}
 
 export default function ReceiptVault() {
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date(2026, 2, 1));
@@ -55,10 +50,7 @@ export default function ReceiptVault() {
   });
 
   // ── Fetch company settings for PDF header ────────────────────────────────
-  const { data: company } = useQuery<CompanyInfo>({
-    queryKey: ["company-settings"],
-    queryFn: () => api.get<CompanyInfo>("/settings"),
-  });
+  const { data: branding } = useBranding();
 
   const selected = payslips.find((p) => p.employee_id === selectedId) ?? payslips[0] ?? null;
   const effectiveId = selected?.employee_id ?? null;
@@ -178,24 +170,24 @@ export default function ReceiptVault() {
                   {/* Watermark */}
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none opacity-[0.03]">
                     <span className="text-[120px] font-black tracking-widest text-foreground rotate-[-30deg]">
-                      {(company?.company_name || "PW").split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()}
+                      {branding?.initials || "S"}
                     </span>
                   </div>
 
                   {/* Header band */}
                   <div className="px-10 pt-8 pb-6 flex items-start justify-between relative bg-slate-900">
                     <div className="flex items-start gap-4">
-                      {company?.logo_path ? (
-                        <img src={company.logo_path} alt="logo" className="h-14 object-contain rounded-lg" />
+                      {branding?.logoPath ? (
+                        <img src={branding.logoPath} alt="logo" className="h-14 object-contain rounded-lg" />
                       ) : (
                         <div className="h-14 w-14 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-black text-xl shrink-0">
-                          {(company?.company_name || "PW").split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()}
+                          {branding?.initials || "S"}
                         </div>
                       )}
                       <div>
-                        <p className="text-[15px] font-bold text-white tracking-tight leading-tight">{company?.company_name ?? "Your Company"}</p>
+                        <p className="text-[15px] font-bold text-white tracking-tight leading-tight">{branding?.companyName || "Your Company"}</p>
                         <p className="text-[10px] text-slate-400 leading-relaxed mt-1">
-                          {(company?.company_address ?? "").split("\\n").map((line: string, i: number) => <span key={i}>{line}{i === 0 && <br />}</span>)}
+                          {(branding?.companyAddress || "").split("\n").map((line: string, i: number) => <span key={i}>{line}{i === 0 && <br />}</span>)}
                         </p>
                       </div>
                     </div>

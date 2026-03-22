@@ -8,10 +8,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Lock, LogIn, Shield, User } from "lucide-react";
 import { useAuth, type AppRole } from "@/contexts/AuthContext";
+import { useBranding } from "@/lib/useBranding";
 
 export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const { data: branding } = useBranding();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
@@ -29,17 +31,30 @@ export default function Login() {
 
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-2">
-            <div className="h-10 w-10 rounded-xl bg-white/10 border border-white/10 flex items-center justify-center font-black text-lg">
-              S
-            </div>
-            <span className="text-lg font-bold tracking-tight">Salary & Advance Tracker</span>
+            {branding?.logoPath ? (
+              <img src={branding.logoPath} alt="Logo" className="h-10 w-10 object-contain rounded-xl bg-white/10" />
+            ) : (
+              <div className="h-10 w-10 rounded-xl bg-white/10 border border-white/10 flex items-center justify-center font-black text-lg">
+                {branding?.initials || "S"}
+              </div>
+            )}
+            <span className="text-lg font-bold tracking-tight">{branding?.companyName || "Salary & Advance Tracker"}</span>
           </div>
         </div>
 
         <div className="relative z-10 space-y-4">
           <h1 className="text-[42px] font-black leading-[1.05] tracking-tight">
-            Salary &<br />
-            Advance Tracker.
+            {branding?.companyName ? (
+              <>
+                {branding.companyName.split(" ")[0]}<br />
+                {branding.companyName.split(" ").slice(1).join(" ")}
+              </>
+            ) : (
+              <>
+                Salary &<br />
+                Advance Tracker.
+              </>
+            )}
           </h1>
           <p className="text-sm text-white/50 max-w-sm leading-relaxed">
             Smart attendance, automated advances, and one-click salary receipts.
@@ -57,8 +72,14 @@ export default function Login() {
         <div className="w-full max-w-[400px] space-y-8">
           {/* Mobile branding */}
           <div className="lg:hidden flex items-center gap-3 justify-center mb-4">
-            <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-bold text-sm">S</div>
-            <span className="text-lg font-bold text-foreground tracking-tight">Salary & Advance Tracker</span>
+            {branding?.logoPath ? (
+              <img src={branding.logoPath} alt="Logo" className="h-9 w-9 object-contain rounded-lg" />
+            ) : (
+              <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-bold text-sm">
+                {branding?.initials || "S"}
+              </div>
+            )}
+            <span className="text-lg font-bold text-foreground tracking-tight">{branding?.companyName || "Salary & Advance Tracker"}</span>
           </div>
 
           <Card className="shadow-xl border-border/50">
@@ -121,7 +142,8 @@ export default function Login() {
           </Card>
 
           <p className="text-[10px] text-muted-foreground text-center">
-            © 2026 Salary & Advance Tracker. All rights reserved.
+            {branding?.companyName ? `© ${new Date().getFullYear()} ${branding.companyName}. ` : "© 2026 Salary & Advance Tracker. "}
+            All rights reserved.
           </p>
         </div>
       </div>
