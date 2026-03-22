@@ -43,6 +43,22 @@ export default function DailyLog() {
   const saveMutation = useMutation({
     mutationFn: (payload: { employee_id: number; date: string; time_in: string; time_out: string; advance_given: number }) =>
       api.post("/attendance", payload),
+    // Optimistic update
+    onMutate: async (newLog) => {
+      await queryClient.cancelQueries({ queryKey: ["attendance", TODAY] });
+      const previousRows = queryClient.getQueryData<ApiAttendanceRow[]>(["attendance", TODAY]);
+      if (previousRows) {
+        queryClient.setQueryData<ApiAttendanceRow[]>(["attendance", TODAY], (old) => {
+          if (!old) return [];
+          return old.map(row => 
+            row.employee_id === newLog.employee_id 
+              ? { ...row, time_in: newLog.time_in, time_out: newLog.time_out, advance_given: newLog.advance_given } 
+              : row
+          );
+        });
+      }
+      return { previousRows };
+    },
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["attendance", TODAY] });
       const row = rows.find((r) => r.employee_id === variables.employee_id);
@@ -51,7 +67,12 @@ export default function DailyLog() {
       });
       setOpenCards((prev) => ({ ...prev, [variables.employee_id]: false }));
     },
-    onError: (err: Error) => toast.error("Failed to save", { description: err.message }),
+    onError: (err: Error, _newLog, context) => {
+      if (context?.previousRows) {
+        queryClient.setQueryData(["attendance", TODAY], context.previousRows);
+      }
+      toast.error("Failed to save", { description: err.message });
+    },
   });
 
   const getEdit = (empId: number, row: ApiAttendanceRow) =>
@@ -65,7 +86,24 @@ export default function DailyLog() {
 
   const saveAttendance = useCallback((row: ApiAttendanceRow) => {
     const ed = getEdit(row.employee_id, row);
-    if (!ed.timeIn || !ed.timeOut) return;
+    
+    // Client-side Validation
+    if (!ed.timeIn) {
+      toast.error("Validation Error", { description: "Time In is required." });
+      return;
+    }
+    if (!ed.timeOut) {
+      toast.error("Validation Error", { description: "Time Out is required." });
+      return;
+    }
+    
+    // Prevent duplicate saves if nothing changed
+    if (ed.timeIn === row.time_in && ed.timeOut === row.time_out && ed.advance === Number(row.advance_given)) {
+      toast.info("No changes to save");
+      setOpenCards((prev) => ({ ...prev, [row.employee_id]: false }));
+      return;
+    }
+
     saveMutation.mutate({ employee_id: row.employee_id, date: TODAY, time_in: ed.timeIn, time_out: ed.timeOut, advance_given: ed.advance });
   }, [localEdits, rows]); // eslint-disable-line react-hooks/exhaustive-deps
 

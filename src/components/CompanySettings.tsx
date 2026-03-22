@@ -66,8 +66,37 @@ export default function CompanySettings({ departments, designations }: Props) {
     onError: (err: Error) => toast.error("Save failed", { description: err.message }),
   });
 
-  const saveTimings = () => saveMutation.mutate({ shift_start: shiftStart, shift_end: shiftEnd, working_hours_per_day: Number(workingHours), grace_period_minutes: Number(gracePeriod) });
-  const saveLeaves  = () => saveMutation.mutate({ annual_paid_leaves: Number(annualLeaves), monthly_leave_accrual: Number(monthlyAccrual), unused_leave_action: unusedLeave });
+  const saveTimings = () => {
+    const hours = Number(workingHours);
+    const grace = Number(gracePeriod);
+    
+    if (isNaN(hours) || hours <= 0 || hours > 24) {
+      toast.error("Validation Error", { description: "Working hours must be between 1 and 24." });
+      return;
+    }
+    if (isNaN(grace) || grace < 0 || grace > 120) {
+      toast.error("Validation Error", { description: "Grace period must be between 0 and 120 minutes." });
+      return;
+    }
+    
+    saveMutation.mutate({ shift_start: shiftStart, shift_end: shiftEnd, working_hours_per_day: hours, grace_period_minutes: grace });
+  };
+  
+  const saveLeaves  = () => {
+    const annual = Number(annualLeaves);
+    const accrual = Number(monthlyAccrual);
+    
+    if (isNaN(annual) || annual < 0 || annual > 365) {
+      toast.error("Validation Error", { description: "Annual leaves must be between 0 and 365." });
+      return;
+    }
+    if (isNaN(accrual) || accrual < 0 || accrual > 31) {
+      toast.error("Validation Error", { description: "Monthly accrual must be between 0 and 31." });
+      return;
+    }
+    
+    saveMutation.mutate({ annual_paid_leaves: annual, monthly_leave_accrual: accrual, unused_leave_action: unusedLeave });
+  };
   const saveBranding= () => saveMutation.mutate({ company_name: companyName, company_address: companyAddr });
 
   // ── Logo upload ──────────────────────────────────────────────────────────
