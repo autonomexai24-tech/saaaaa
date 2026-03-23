@@ -3,6 +3,7 @@ import cors from "cors";
 import path from "path";
 import fs from "fs";
 import dotenv from "dotenv";
+import { fileURLToPath } from 'url';
 
 dotenv.config();
 
@@ -44,15 +45,20 @@ app.get("/api/health", (_req, res) => res.json({ status: "ok", time: new Date() 
 // ── API 404 catch-all (only for /api/* routes) ────────────────────────────
 app.use("/api", (_req, res) => res.status(404).json({ error: "API route not found" }));
 
-import { fileURLToPath } from 'url';
+// ── Production: serve Vite-built frontend ──────────────────────────────────
+// Resolve __dirname safely for both ESM and CommonJS
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// ── Production: serve Vite-built frontend ──────────────────────────────────
-const distPath = path.join(__dirname, '../dist'); 
-app.use(express.static(distPath));
-app.get(/^.*$/, (req, res) => {
-  res.sendFile(path.join(distPath, 'index.html'));
+// The compiled index.js is inside /dist-server, so the frontend is at ../dist
+const frontendDistPath = path.join(__dirname, '../dist');
+
+// Serve static assets correctly
+app.use(express.static(frontendDistPath));
+
+// Catch-all to serve index.html for React Router
+app.get('*', (req, res) => {
+  res.sendFile(path.join(frontendDistPath, 'index.html'));
 });
 
 // ── Database Sync & Server Start ────────────────────────────────────────────
