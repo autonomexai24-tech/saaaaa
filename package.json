@@ -4,17 +4,13 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "frontend": "vite",
-    "backend": "npx tsx server/index.ts",
+    "dev": "vite",
     "server": "npx tsx server/index.ts",
-    "dev": "concurrently -n UI,API -c cyan,yellow \"npm run frontend\" \"npm run backend\"",
+    "dev:full": "concurrently -n UI,API -c cyan,yellow \"npm run dev\" \"npm run server\"",
     "build": "vite build && tsup server/index.ts --format esm --out-dir dist-server",
-    "build:dev": "vite build --mode development",
-    "start": "NODE_ENV=production node dist-server/index.js",
+    "start": "node dist-server/index.js",
     "lint": "eslint .",
-    "preview": "vite preview",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "preview": "vite preview"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
